@@ -34,11 +34,11 @@ COPY requirements.txt ./requirements.txt
 RUN pip install --upgrade pip setuptools wheel && \
     pip install -r requirements.txt
 
-# Install Playwright browsers with system dependencies
-# Use --with-deps to install all required system libraries
+# Install Playwright browsers
+# Note: We don't use --with-deps because we've already installed all system dependencies above
 # Install browsers to a location that persists in the container
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
-RUN playwright install --with-deps chromium
+RUN playwright install chromium
 
 # Verify Playwright installation
 RUN python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(headless=True); browser.close(); p.stop(); print('Playwright Chromium verified!')"

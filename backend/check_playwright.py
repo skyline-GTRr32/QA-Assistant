@@ -24,7 +24,7 @@ def check_playwright():
         print("Installing Playwright browsers...")
         try:
             subprocess.run(
-                ["playwright", "install", "--with-deps", "chromium"],
+                ["playwright", "install", "chromium"],
                 check=True,
                 capture_output=True
             )
