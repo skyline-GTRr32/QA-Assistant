@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, VStack, Text, HStack, Link } from '@chakra-ui/react'
+import { Box, VStack, Text } from '@chakra-ui/react'
 
 export const Footer = () => {
   return (
@@ -10,13 +10,7 @@ export const Footer = () => {
           QA Assistant
         </Text>
         <Text>AI-powered website quality assurance</Text>
-        <HStack spacing={3}>
-          <Link href="#" _hover={{ color: 'blue.300', textDecoration: 'underline' }}>Privacy Policy</Link>
-          <Text>·</Text>
-          <Link href="#" _hover={{ color: 'blue.300', textDecoration: 'underline' }}>Terms of Service</Link>
-          <Text>·</Text>
-          <Link href="#" _hover={{ color: 'blue.300', textDecoration: 'underline' }}>Contact</Link>
-        </HStack>
+        <Text fontSize="sm">Made by Umar Umais</Text>
         <Text fontSize="sm">© 2025 • Built with ❤️ and AI</Text>
       </VStack>
     </Box>

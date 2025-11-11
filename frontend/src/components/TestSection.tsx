@@ -111,7 +111,7 @@ export const TestSection = () => {
   }
 
   return (
-    <Box as="section" position="relative" bgGradient="linear(to-b, #fafafa, #f9fafb)" pt={{ base: 12, md: 20 }} pb={{ base: 16, md: 24 }}>
+    <Box as="section" id="try" position="relative" bgGradient="linear(to-b, #fafafa, #f9fafb)" pt={{ base: 12, md: 20 }} pb={{ base: 16, md: 24 }}>
       {/* Wave divider top */}
       <Box
         aria-hidden

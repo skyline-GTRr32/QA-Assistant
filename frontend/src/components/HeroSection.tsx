@@ -128,8 +128,13 @@ export const HeroSection = () => {
           mt={4}
         >
           <Box
-            as="a"
-            href="#try"
+            as="button"
+            onClick={() => {
+              const element = document.getElementById('try')
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }}
             px={6}
             py={3}
             borderRadius="md"
@@ -137,6 +142,8 @@ export const HeroSection = () => {
             border="1px solid #3b82f6"
             color="white"
             fontFamily="mono"
+            cursor="pointer"
+            _hover={{ bg: '#0f172a' }}
           >
             → Start Analysis  <Box as="span" color="#9ca3af">Press ⌘K</Box>
           </Box>
