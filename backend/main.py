@@ -1,7 +1,4 @@
 # backend/main.py
-import nest_asyncio # <-- 1. IMPORT
-nest_asyncio.apply() # <-- 2. APPLY THE PATCH AT THE VERY TOP
-
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
