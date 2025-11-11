@@ -27,7 +27,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first (for better caching)
-COPY backend/requirements.txt ./requirements.txt
+# Note: Root directory is set to 'backend' in Railway, so paths are relative to backend/
+COPY requirements.txt ./requirements.txt
 
 # Upgrade pip and install Python dependencies
 RUN pip install --upgrade pip setuptools wheel && \
@@ -40,11 +41,8 @@ RUN playwright install --with-deps chromium
 # Verify Playwright installation
 RUN python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(headless=True); browser.close(); p.stop(); print('Playwright Chromium verified!')"
 
-# Copy backend code
-COPY backend/ ./backend/
-
-# Set working directory to backend
-WORKDIR /app/backend
+# Copy backend code (all files from backend/ directory)
+COPY . .
 
 # Expose port
 EXPOSE $PORT
