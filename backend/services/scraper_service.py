@@ -78,32 +78,32 @@ class WebsiteScraper:
             soup = BeautifulSoup(response.text, "html.parser")
             logging.info(f"HTML content parsed, length: {len(str(soup))} characters")
 
-                    logging.info("Processing resources (making URLs absolute)...")
-                    self._process_resources(soup)
+            logging.info("Processing resources (making URLs absolute)...")
+            self._process_resources(soup)
 
-                    logging.info("Extracting metadata...")
+            logging.info("Extracting metadata...")
             metadata = self._extract_metadata(soup)
 
-                    logging.info("Extracting scripts...")
+            logging.info("Extracting scripts...")
             scripts = self._extract_scripts(soup)
 
-                    logging.info("Extracting styles...")
+            logging.info("Extracting styles...")
             styles = self._extract_all_styles(soup, session)
 
-                    logging.info("Extracting assets...")
+            logging.info("Extracting assets...")
             assets = self._extract_assets(soup)
 
-                    logging.info("Scraping completed successfully")
-                    return {
-                        "success": True,
-                        "data": {
-                            "html": str(soup),
-                            "styles": styles,
-                            "assets": assets,
-                            "metadata": metadata,
-                            "scripts": scripts,
-                        },
-                    }
+            logging.info("Scraping completed successfully")
+            return {
+                "success": True,
+                "data": {
+                    "html": str(soup),
+                    "styles": styles,
+                    "assets": assets,
+                    "metadata": metadata,
+                    "scripts": scripts,
+                },
+            }
 
         except requests.exceptions.RequestException as e:
             logging.error(f"HTTP request failed: {e}", exc_info=True)
