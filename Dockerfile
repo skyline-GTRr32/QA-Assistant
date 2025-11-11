@@ -46,12 +46,11 @@ RUN python -c "from playwright.sync_api import sync_playwright; p = sync_playwri
 # Copy backend code (all files from backend/ directory)
 COPY . .
 
-# Make check script executable
-RUN chmod +x check_playwright.py || true
+# Make scripts executable
+RUN chmod +x check_playwright.py start.sh || true
 
-# Expose port
-EXPOSE $PORT
+# Expose port (Railway will set PORT environment variable)
+EXPOSE 8000
 
-# Start command - check Playwright first, then start server
-# Use shell to expand PORT environment variable
-CMD ["sh", "-c", "python check_playwright.py && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio"]
+# Default start command (can be overridden by Railway start command)
+CMD ["./start.sh"]
