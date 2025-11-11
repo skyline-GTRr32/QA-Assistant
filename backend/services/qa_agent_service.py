@@ -296,10 +296,10 @@ You MUST return a single valid JSON object with the following exact schema. Do n
         # Build the user content that provides the dynamic inputs for the analysis
         user_content = f"""
 DESIGN DOCUMENTATION CONTEXT (RAG):
-{design_context}
+        {design_context}
 
 SCRAPED WEBSITE ANALYSIS DATA:
-{json.dumps(analysis_data, indent=2)}
+        {json.dumps(analysis_data, indent=2)}
 
 TASK:
 1) Extract ALL specifications from the documentation context (with exact quotes and page numbers).
@@ -307,7 +307,7 @@ TASK:
 3) Apply the CRITICAL RULES strictly (statuses only "match" or "mismatch").
 4) Include a 'verification_process' array that shows your RAG query, doc evidence (with page), website evidence, and the comparison result for each check performed.
 5) Return a single JSON object that strictly matches the OUTPUT CONTRACT schema above.
-"""
+        """
         try:
             response = self.client.chat.completions.create(
                 model=self.model,

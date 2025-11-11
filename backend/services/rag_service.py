@@ -7,7 +7,9 @@ from chromadb.utils import embedding_functions
 import fitz  # PyMuPDF
 from dotenv import load_dotenv
 import re
+import time
 from openai import OpenAI
+from openai import APIConnectionError, APIError, RateLimitError
 
 load_dotenv()
 
@@ -22,7 +24,12 @@ class OpenAIEmbeddingFunction:
             api_key: OpenAI API key
             model_name: Embedding model name (text-embedding-3-small or text-embedding-3-large)
         """
-        self.client = OpenAI(api_key=api_key)
+        # Configure OpenAI client with timeout and retry settings
+        self.client = OpenAI(
+            api_key=api_key,
+            timeout=60.0,  # 60 second timeout
+            max_retries=3  # OpenAI client already has retry logic
+        )
         self.model_name = model_name
         
         # Set dimension based on model
@@ -33,7 +40,7 @@ class OpenAIEmbeddingFunction:
     
     def __call__(self, input: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
         """
-        Generate embeddings for input text(s).
+        Generate embeddings for input text(s) with retry logic.
         
         Args:
             input: Single text string or list of text strings
@@ -41,20 +48,45 @@ class OpenAIEmbeddingFunction:
         Returns:
             Single embedding vector or list of embedding vectors
         """
-        # Handle single string input
-        if isinstance(input, str):
-            response = self.client.embeddings.create(
-                model=self.model_name,
-                input=input
-            )
-            return response.data[0].embedding
+        max_retries = 3
+        retry_delay = 1
         
-        # Handle list of strings
-        response = self.client.embeddings.create(
-            model=self.model_name,
-            input=input
-        )
-        return [item.embedding for item in response.data]
+        for attempt in range(max_retries):
+            try:
+                # Handle single string input
+                if isinstance(input, str):
+                    response = self.client.embeddings.create(
+                        model=self.model_name,
+                        input=input
+                    )
+                    return response.data[0].embedding
+                
+                # Handle list of strings
+                response = self.client.embeddings.create(
+                    model=self.model_name,
+                    input=input
+                )
+                return [item.embedding for item in response.data]
+                
+            except (APIConnectionError, APIError) as e:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    print(f"OpenAI API error (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"OpenAI API error after {max_retries} attempts: {e}")
+                    raise
+            except RateLimitError as e:
+                wait_time = 60  # Wait 60 seconds for rate limit
+                if attempt < max_retries - 1:
+                    print(f"Rate limit exceeded (attempt {attempt + 1}/{max_retries}). Waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"Rate limit error after {max_retries} attempts: {e}")
+                    raise
+            except Exception as e:
+                print(f"Unexpected error generating embeddings: {e}")
+                raise
 
 class RAGService:
     def __init__(self):
@@ -107,25 +139,40 @@ class RAGService:
         """
         try:
             file_path = Path(file_path)
+            print(f"Extracting text from {file_path}...")
             text = self._extract_text(file_path)
             
             if not text or not text.strip():
                 print(f"ERROR: No text could be extracted from {file_path}. Cannot create RAG collection.")
                 return False
 
+            print(f"Text extracted: {len(text)} characters. Chunking...")
             chunks = self.chunk_text(text)
             if not chunks:
                 print(f"Warning: No text chunks were generated from the extracted text of {file_path}.")
                 return False
 
+            print(f"Created {len(chunks)} chunks. Creating collection and generating embeddings...")
             collection_name = f"run_{run_id}"
             collection = self.chroma_client.get_or_create_collection(name=collection_name, embedding_function=self.embedding_function)
             ids = [f"{run_id}_{i}" for i in range(len(chunks))]
-            collection.add(documents=chunks, metadatas=[{"source": file_path.name} for _ in chunks], ids=ids)
+            
+            # Add documents in batches to avoid overwhelming the API
+            batch_size = 10
+            for i in range(0, len(chunks), batch_size):
+                batch_chunks = chunks[i:i+batch_size]
+                batch_ids = ids[i:i+batch_size]
+                batch_metadatas = [{"source": file_path.name} for _ in batch_chunks]
+                
+                print(f"Indexing batch {i//batch_size + 1}/{(len(chunks) + batch_size - 1)//batch_size} ({len(batch_chunks)} chunks)...")
+                collection.add(documents=batch_chunks, metadatas=batch_metadatas, ids=batch_ids)
+            
             print(f"Successfully indexed {len(chunks)} chunks into collection '{collection_name}'")
             return True
         except Exception as e:
+            import traceback
             print(f"Error processing file {file_path}: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
             return False
 
     def query_collection(self, question: str, run_id: str, k: int = 5) -> Dict[str, any]:
