@@ -50,7 +50,7 @@ export const HeroSection = () => {
       />
 
       {/* Content - tech style */}
-      <MotionBox style={{ rotateX: rotX, rotateY: rotY }} transformStyle="preserve-3d">
+      <MotionBox style={{ rotateX: rotX, rotateY: rotY, transformStyle: 'preserve-3d' }}>
       <VStack
         spacing={6}
         align="start"
