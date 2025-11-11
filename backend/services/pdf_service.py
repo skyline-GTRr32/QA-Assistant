@@ -119,7 +119,7 @@ class PDFService:
         # Screenshots (if any collected via issues)
         shots = self._collect_issue_screenshots(report_data, run_dir)
         if shots:
-        story.append(PageBreak())
+            story.append(PageBreak())
             story.append(Paragraph("Screenshots", styles["H1"]))
             for shot_path, caption in shots:
                 if shot_path and shot_path.exists():
