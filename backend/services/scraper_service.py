@@ -260,7 +260,7 @@ class WebsiteScraper:
 
     def _extract_background_images(self, page) -> List[Dict]:
         return page.evaluate(
-            """() => {
+            r"""() => {
                 const bgImages = [];
                 document.querySelectorAll('*').forEach(el => {
                     const bgImage = window.getComputedStyle(el).backgroundImage;

@@ -283,9 +283,9 @@ class WebsiteAnalyzerAgent:
             for rule in data['styles']['css_rules']:
                 css_text = rule.get('cssText', '')
                 
-                if 'display:\s*grid' in css_text or 'display:grid' in css_text:
+                if 'display:\\s*grid' in css_text or 'display:grid' in css_text:
                     layout['grid_usage'] = True
-                if 'display:\s*flex' in css_text or 'display:flex' in css_text:
+                if 'display:\\s*flex' in css_text or 'display:flex' in css_text:
                     layout['flexbox_usage'] = True
                 
                 # Position types
