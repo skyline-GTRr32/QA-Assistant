@@ -46,7 +46,7 @@ except Exception as e:
     print("⚠ Application will start but RAG features will not work")
 
 try:
-    openai_key = os.getenv("OPENAI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()  # Strip whitespace/newlines
     if not openai_key:
         print("⚠ OPENAI_API_KEY not found, QA Agent will not work")
     else:

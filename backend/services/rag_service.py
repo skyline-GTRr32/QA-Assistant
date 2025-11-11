@@ -96,7 +96,8 @@ class RAGService:
         # The QA Agent will handle all LLM calls.
         
         # Get OpenAI API key from environment
-        openai_api_key = os.getenv("OPENAI_API_KEY")
+        # Strip whitespace (newlines, spaces) that might be in the environment variable
+        openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not openai_api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required for embeddings")
         
