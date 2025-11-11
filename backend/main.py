@@ -20,7 +20,13 @@ from services.pdf_service import PDFService
 load_dotenv()
 
 # Initialize FastAPI app
-app = FastAPI(title="Website QA Agent API")
+app = FastAPI(
+    title="Website QA Agent API",
+    description="AI-powered website quality assurance tool",
+    version="1.0.0"
+)
+# CORS: Allow all origins for now (you can restrict to your Vercel domain later)
+# Example: allow_origins=["https://qa-assistant-sigma.vercel.app", "https://your-domain.vercel.app"]
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # Initialize all services
@@ -96,6 +102,18 @@ def analyze_full_website(url: str = Form(...), file: UploadFile = File(...)):
         if temp_file_path.exists():
             temp_file_path.unlink()
         rag_service.cleanup_collection(run_id)
+
+@app.get("/")
+def root():
+    return {
+        "message": "Website QA Agent API",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/api/health",
+            "analyze": "/api/analyze (POST)",
+            "docs": "/docs"
+        }
+    }
 
 @app.get("/api/health")
 def health_check():
