@@ -1,0 +1,36 @@
+# Option 1: Playwright (Best for dynamic/JavaScript sites) - RECOMMENDED
+playwright==1.48.0
+cssutils==2.11.1
+
+# Option 2: For simpler static sites (Alternative)
+beautifulsoup4==4.12.3
+requests==2.32.3
+lxml==5.3.0
+
+# Option 3: For large-scale projects
+scrapy==2.11.2
+
+# Option 4: Selenium (if you prefer it over Playwright)
+selenium==4.25.0
+webdriver-manager==4.0.2
+
+# Additional useful libraries
+html5lib==1.1  # HTML parser
+cssselect==1.2.0  # CSS selector support
+pyquery==2.0.1  # jQuery-like syntax for Python
+
+# For data handling
+pandas==2.2.3
+openpyxl==3.1.5  # For Excel export
+
+# After installing playwright, run:
+# playwright install chromium
+# Web Scraping
+
+
+# AI Analysis
+groq==0.4.1
+
+# Utilities (usually pre-installed)
+asyncio
+pathlib

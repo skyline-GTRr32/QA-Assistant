@@ -1,0 +1,27 @@
+# Runs directory (generated reports)
+runs/
+
+# ChromaDB database
+chroma_db/
+
+# Uploads
+uploads/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+.env.local
+
+# Test files
+test_*.py
+*_test.py
+
+# Temporary
+*.tmp
+*.log
+
