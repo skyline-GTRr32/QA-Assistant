@@ -1,8 +1,9 @@
 [phases.setup]
-nixPkgs = ["python312", "pip"]
+nixPkgs = ["python311", "pip", "gcc", "g++", "make"]
 
 [phases.install]
 cmds = [
+  "pip install --upgrade pip setuptools wheel",
   "pip install -r backend/requirements.txt",
   "playwright install chromium"
 ]
