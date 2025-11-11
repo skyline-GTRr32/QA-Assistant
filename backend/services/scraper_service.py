@@ -1,19 +1,18 @@
 # backend/services/scraper_service.py
 import re
-import sys
-import asyncio
 from urllib.parse import urlparse, urljoin
 from typing import Dict, List, Any
 import logging
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+import cssutils
+import time
 
-# ✅ CRITICAL FIX (Windows Only)
-# Playwright requires the ProactorEventLoopPolicy to spawn subprocesses properly.
-# This must be set BEFORE any Playwright operations.
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+# Disable CSS warnings from cssutils
+cssutils.log.setLevel('ERROR')
 
 
 class ScraperService:
@@ -45,110 +44,90 @@ class WebsiteScraper:
     def scrape(self) -> Dict:
         logging.info(f"Starting scrape for URL: {self.url}")
         try:
-            logging.info("Initializing Playwright...")
-            with sync_playwright() as p:
-                logging.info("Playwright initialized successfully")
+            # Create a session with retry strategy
+            session = requests.Session()
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[429, 500, 502, 503, 504],
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            
+            # Set headers to mimic a real browser
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            }
+            
+            logging.info(f"Fetching {self.url}...")
+            response = session.get(self.url, headers=headers, timeout=30, verify=True)
+            response.raise_for_status()
+            logging.info(f"Page fetched successfully, status: {response.status_code}")
 
-                try:
-                    logging.info("Launching Chromium browser...")
-                    browser = p.chromium.launch(
-                        headless=True,
-                        args=[
-                            "--disable-blink-features=AutomationControlled",
-                            "--disable-dev-shm-usage",
-                            "--no-sandbox"
-                        ]
-                    )
-                    logging.info("Browser launched successfully")
-                except Exception as browser_error:
-                    logging.error(f"Browser launch failed: {browser_error}", exc_info=True)
-                    return {"success": False, "error": f"Browser launch failed: {str(browser_error)}"}
+            logging.info("Parsing HTML content...")
+            soup = BeautifulSoup(response.text, "html.parser")
+            logging.info(f"HTML content parsed, length: {len(str(soup))} characters")
 
-                try:
-                    logging.info("Creating browser context...")
-                    context = browser.new_context(
-                        viewport={"width": 1920, "height": 1080},
-                        user_agent=(
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                            "Chrome/120.0.0.0 Safari/537.36"
-                        ),
-                        java_script_enabled=True,
-                        ignore_https_errors=True,
-                    )
-                    logging.info("Browser context created successfully")
+            logging.info("Processing resources (making URLs absolute)...")
+            self._process_resources(soup)
 
-                    logging.info("Creating new page...")
-                    page = context.new_page()
-                    page.set_default_timeout(120000)
-                    logging.info("Page created successfully")
+            logging.info("Extracting metadata...")
+            metadata = self._extract_metadata(soup)
 
-                    logging.info(f"Navigating to {self.url}...")
-                    response = page.goto(self.url, wait_until="networkidle", timeout=120000)
-                    logging.info(f"Navigation completed with status: {response.status if response else 'N/A'}")
+            logging.info("Extracting scripts...")
+            scripts = self._extract_scripts(soup)
 
-                    if not response or not response.ok:
-                        raise Exception(f"Failed to load page: Status {response.status if response else 'N/A'}")
+            logging.info("Extracting styles...")
+            styles = self._extract_all_styles(soup, session)
 
-                    logging.info("Preparing page (scrolling, waiting)...")
-                    self._prepare_page(page)
+            logging.info("Extracting assets...")
+            assets = self._extract_assets(soup)
 
-                    logging.info("Extracting HTML content...")
-                    html_content = page.content()
-                    soup = BeautifulSoup(html_content, "html.parser")
-                    logging.info(f"HTML content extracted, length: {len(str(soup))} characters")
+            logging.info("Scraping completed successfully")
+            return {
+                "success": True,
+                "data": {
+                    "html": str(soup),
+                    "styles": styles,
+                    "assets": assets,
+                    "metadata": metadata,
+                    "scripts": scripts,
+                },
+            }
 
-                    logging.info("Processing resources (making URLs absolute)...")
-                    self._process_resources(soup)
-
-                    logging.info("Extracting metadata...")
-                    metadata = self._extract_metadata(page)
-
-                    logging.info("Extracting scripts...")
-                    scripts = self._extract_scripts(page)
-
-                    logging.info("Extracting styles...")
-                    styles = self._extract_all_styles(page, soup)
-
-                    logging.info("Extracting assets...")
-                    assets = self._extract_assets(page, soup)
-
-                    logging.info("Scraping completed successfully")
-                    return {
-                        "success": True,
-                        "data": {
-                            "html": str(soup),
-                            "styles": styles,
-                            "assets": assets,
-                            "metadata": metadata,
-                            "scripts": scripts,
-                        },
-                    }
-
-                except Exception as page_error:
-                    logging.error(f"Page operation failed: {page_error}", exc_info=True)
-                    return {"success": False, "error": f"Page operation failed: {str(page_error)}"}
-
-                finally:
-                    logging.info("Closing browser...")
-                    browser.close()
-                    logging.info("Browser closed")
-
+        except requests.exceptions.RequestException as e:
+            logging.error(f"HTTP request failed: {e}", exc_info=True)
+            return {"success": False, "error": f"Failed to fetch page: {str(e)}"}
         except Exception as e:
-            logging.error(f"Playwright initialization failed: {e}", exc_info=True)
-            return {"success": False, "error": f"Playwright initialization failed: {str(e)}"}
+            logging.error(f"Scraping failed: {e}", exc_info=True)
+            return {"success": False, "error": f"Scraping failed: {str(e)}"}
 
     # --------------------------------------------------------------------------
     # Helper methods
     # --------------------------------------------------------------------------
 
-    def _prepare_page(self, page):
-        page.wait_for_load_state("domcontentloaded")
-        page.wait_for_timeout(2000)
-        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(1000)
-        page.evaluate("window.scrollTo(0, 0)")
-        page.wait_for_timeout(500)
+    def _fetch_stylesheet(self, session: requests.Session, url: str) -> str:
+        """Fetch a stylesheet and return its content."""
+        try:
+            if not url or url.startswith("data:"):
+                return ""
+            absolute_url = self._make_absolute(url)
+            response = session.get(absolute_url, timeout=10, verify=True)
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            logging.warning(f"Failed to fetch stylesheet {url}: {e}")
+            return ""
 
     def _process_resources(self, soup):
         for tag in soup.find_all(["a", "link", "img", "script", "source", "iframe"], href=True):
@@ -174,159 +153,199 @@ class WebsiteScraper:
             return url
         return urljoin(self.base_url, url)
 
-    def _extract_all_styles(self, page, soup) -> Dict:
+    def _extract_all_styles(self, soup: BeautifulSoup, session: requests.Session) -> Dict:
+        """Extract all styles from the page."""
+        # Extract inline styles from elements
+        inline_styles = self._extract_inline_styles(soup)
+        
+        # Extract external stylesheets
+        external_stylesheets = []
+        for link in soup.find_all("link", rel="stylesheet"):
+            href = link.get("href", "")
+            if href:
+                external_stylesheets.append({
+                    "href": self._make_absolute(href),
+                    "media": link.get("media", "all")
+                })
+        
+        # Extract style tags
+        style_tags = [str(tag) for tag in soup.find_all("style")]
+        
+        # Extract CSS rules from all stylesheets
+        css_rules = []
+        for link in soup.find_all("link", rel="stylesheet"):
+            href = link.get("href", "")
+            if href:
+                css_content = self._fetch_stylesheet(session, href)
+                if css_content:
+                    css_rules.extend(self._parse_css_rules(css_content, href))
+        
+        # Also parse style tags
+        for style_tag in soup.find_all("style"):
+            css_content = style_tag.string or ""
+            if css_content:
+                css_rules.extend(self._parse_css_rules(css_content, "inline"))
+        
         return {
-            "inline": self._extract_inline_styles(page),
-            "external": page.evaluate(
-                "() => Array.from(document.querySelectorAll('link[rel=\"stylesheet\"]')).map(link => ({ href: link.href, media: link.media }))"
-            ),
-            "style_tags": [str(tag) for tag in soup.find_all("style")],
-            "computed": self._extract_computed_styles(page),
-            "css_rules": self._extract_css_rules(page),
+            "inline": inline_styles,
+            "external": external_stylesheets,
+            "style_tags": style_tags,
+            "computed": {},  # Cannot get computed styles without JavaScript
+            "css_rules": css_rules,
         }
 
-    def _extract_inline_styles(self, page) -> List[Dict]:
-        return page.evaluate(
-            """() =>
-                Array.from(document.querySelectorAll('[style]')).map(el => ({
-                    selector:
-                        el.tagName +
-                        (el.id ? '#' + el.id : '') +
-                        (el.className ? '.' + el.className.split(' ').join('.') : ''),
-                    styles: el.getAttribute('style'),
-                }))"""
-        )
+    def _extract_inline_styles(self, soup: BeautifulSoup) -> List[Dict]:
+        """Extract inline styles from elements."""
+        inline_styles = []
+        for element in soup.find_all(style=True):
+            selector = element.name
+            if element.get("id"):
+                selector += f"#{element.get('id')}"
+            if element.get("class"):
+                classes = " ".join(element.get("class", []))
+                selector += f".{classes.replace(' ', '.')}"
+            
+            inline_styles.append({
+                "selector": selector,
+                "styles": element.get("style", "")
+            })
+        return inline_styles
 
-    def _extract_css_rules(self, page) -> List[Dict]:
-        return page.evaluate(
-            """() => {
-                const rules = [];
-                for (const sheet of document.styleSheets) {
-                    try {
-                        for (const rule of (sheet.cssRules || [])) {
-                            if (rule.selectorText) {
-                                rules.push({
-                                    selector: rule.selectorText,
-                                    cssText: rule.cssText,
-                                    href: sheet.href || 'inline'
-                                });
-                            }
-                        }
-                    } catch (e) {}
-                }
-                return rules;
-            }"""
-        )
+    def _parse_css_rules(self, css_content: str, source: str) -> List[Dict]:
+        """Parse CSS rules from CSS content."""
+        rules = []
+        try:
+            sheet = cssutils.parseString(css_content)
+            for rule in sheet:
+                if rule.type == rule.STYLE_RULE:
+                    rules.append({
+                        "selector": rule.selectorText,
+                        "cssText": rule.cssText,
+                        "href": source
+                    })
+        except Exception as e:
+            logging.warning(f"Failed to parse CSS from {source}: {e}")
+        return rules
 
-    def _extract_computed_styles(self, page) -> Dict:
-        return page.evaluate(
-            """() => {
-                const styles = {};
-                document.querySelectorAll('h1, h2, h3, p, a, button, input').forEach(el => {
-                    const selector =
-                        el.tagName +
-                        (el.id ? '#' + el.id : '') +
-                        (el.className ? '.' + el.className.split(' ').join('.') : '');
-                    if (selector && !styles[selector]) {
-                        const computed = window.getComputedStyle(el);
-                        styles[selector] = Array.from(computed).reduce((acc, prop) => {
-                            acc[prop] = computed.getPropertyValue(prop);
-                            return acc;
-                        }, {});
-                    }
-                });
-                return styles;
-            }"""
-        )
-
-    def _extract_assets(self, page, soup) -> Dict:
+    def _extract_assets(self, soup: BeautifulSoup) -> Dict:
+        """Extract assets from the page."""
         return {
-            "images": self._extract_assets_by_type(page, "img", "src"),
-            "background_images": self._extract_background_images(page),
-            "fonts": self._extract_fonts(page),
+            "images": self._extract_assets_by_type(soup, "img", "src"),
+            "background_images": self._extract_background_images(soup),
+            "fonts": self._extract_fonts(soup),
         }
 
-    def _extract_assets_by_type(self, page, selector: str, attr: str) -> List[Dict]:
-        return page.evaluate(
-            """({ selector, attr }) =>
-                Array.from(document.querySelectorAll(selector))
-                    .filter(el => el[attr])
-                    .map(el => ({
-                        src: el[attr],
-                        alt: el.alt || ''
-                    }))""",
-            {"selector": selector, "attr": attr},
-        )
+    def _extract_assets_by_type(self, soup: BeautifulSoup, tag: str, attr: str) -> List[Dict]:
+        """Extract assets by tag type."""
+        assets = []
+        for element in soup.find_all(tag):
+            src = element.get(attr, "")
+            if src:
+                assets.append({
+                    "src": self._make_absolute(src),
+                    "alt": element.get("alt", "")
+                })
+        return assets
 
-    def _extract_background_images(self, page) -> List[Dict]:
-        return page.evaluate(
-            r"""() => {
-                const bgImages = [];
-                document.querySelectorAll('*').forEach(el => {
-                    const bgImage = window.getComputedStyle(el).backgroundImage;
-                    if (bgImage && bgImage !== 'none') {
-                        const urls = bgImage.match(/url\(["']?(.*?)["']?\)/g) || [];
-                        urls.forEach(url => {
-                            const cleanUrl = url.replace(/^url\(["']?|["']?\)$/g, '');
-                            if (cleanUrl && !cleanUrl.startsWith('data:')) {
-                                bgImages.push({
-                                    src: cleanUrl,
-                                    element: el.tagName.toLowerCase(),
-                                    class: el.className || '',
-                                    id: el.id || ''
-                                });
-                            }
-                        });
-                    }
-                });
-                return bgImages;
-            }"""
-        )
+    def _extract_background_images(self, soup: BeautifulSoup) -> List[Dict]:
+        """Extract background images from inline styles and CSS."""
+        bg_images = []
+        
+        # Extract from inline styles
+        for element in soup.find_all(style=True):
+            style = element.get("style", "")
+            urls = re.findall(r'url\(["\']?([^"\']+)["\']?\)', style)
+            for url in urls:
+                if url and not url.startswith("data:"):
+                    bg_images.append({
+                        "src": self._make_absolute(url),
+                        "element": element.name or "",
+                        "class": " ".join(element.get("class", [])),
+                        "id": element.get("id", "")
+                    })
+        
+        # Extract from style tags (basic regex matching)
+        for style_tag in soup.find_all("style"):
+            css_content = style_tag.string or ""
+            urls = re.findall(r'background-image:\s*url\(["\']?([^"\']+)["\']?\)', css_content, re.IGNORECASE)
+            for url in urls:
+                if url and not url.startswith("data:"):
+                    bg_images.append({
+                        "src": self._make_absolute(url),
+                        "element": "",
+                        "class": "",
+                        "id": ""
+                    })
+        
+        return bg_images
 
-    def _extract_fonts(self, page) -> List[Dict]:
-        return page.evaluate(
-            """() => {
-                const fonts = [];
-                try {
-                    for (const sheet of document.styleSheets) {
-                        try {
-                            for (const rule of (sheet.cssRules || [])) {
-                                if (rule instanceof CSSFontFaceRule) {
-                                    fonts.push({
-                                        cssText: rule.cssText,
-                                        href: sheet.href || 'inline',
-                                        fontFamily: rule.style.fontFamily,
-                                        src: rule.style.src
-                                    });
-                                }
-                            }
-                        } catch (e) {}
-                    }
-                } catch (e) {}
-                return fonts;
-            }"""
-        )
+    def _extract_fonts(self, soup: BeautifulSoup) -> List[Dict]:
+        """Extract font-face rules from CSS."""
+        fonts = []
+        
+        # Extract from style tags
+        for style_tag in soup.find_all("style"):
+            css_content = style_tag.string or ""
+            if css_content:
+                try:
+                    sheet = cssutils.parseString(css_content)
+                    for rule in sheet:
+                        if rule.type == rule.FONT_FACE_RULE:
+                            fonts.append({
+                                "cssText": rule.cssText,
+                                "href": "inline",
+                                "fontFamily": rule.style.getPropertyValue("font-family") or "",
+                                "src": rule.style.getPropertyValue("src") or ""
+                            })
+                except Exception as e:
+                    logging.warning(f"Failed to parse fonts from style tag: {e}")
+        
+        return fonts
 
-    def _extract_scripts(self, page) -> List[Dict]:
-        return page.evaluate(
-            """() =>
-                Array.from(document.scripts).map(script => ({
-                    src: script.src || 'inline',
-                    async: script.async,
-                    defer: script.defer,
-                    type: script.type || 'text/javascript'
-                }))"""
-        )
+    def _extract_scripts(self, soup: BeautifulSoup) -> List[Dict]:
+        """Extract script tags from the page."""
+        scripts = []
+        for script in soup.find_all("script"):
+            scripts.append({
+                "src": self._make_absolute(script.get("src", "")) if script.get("src") else "inline",
+                "async": script.get("async") is not None,
+                "defer": script.get("defer") is not None,
+                "type": script.get("type", "text/javascript")
+            })
+        return scripts
 
-    def _extract_metadata(self, page) -> Dict:
-        return page.evaluate(
-            """() => ({
-                title: document.title,
-                description: document.querySelector('meta[name="description"]')?.content || '',
-                keywords: document.querySelector('meta[name="keywords"]')?.content || '',
-                viewport: document.querySelector('meta[name="viewport"]')?.content || '',
-                url: window.location.href,
-                language: document.documentElement.lang,
-                charset: document.characterSet
-            })"""
-        )
+    def _extract_metadata(self, soup: BeautifulSoup) -> Dict:
+        """Extract metadata from the page."""
+        title_tag = soup.find("title")
+        title = title_tag.string if title_tag else ""
+        
+        description_meta = soup.find("meta", attrs={"name": "description"})
+        description = description_meta.get("content", "") if description_meta else ""
+        
+        keywords_meta = soup.find("meta", attrs={"name": "keywords"})
+        keywords = keywords_meta.get("content", "") if keywords_meta else ""
+        
+        viewport_meta = soup.find("meta", attrs={"name": "viewport"})
+        viewport = viewport_meta.get("content", "") if viewport_meta else ""
+        
+        html_tag = soup.find("html")
+        language = html_tag.get("lang", "") if html_tag else ""
+        
+        charset_meta = soup.find("meta", attrs={"charset": True})
+        charset = charset_meta.get("charset", "") if charset_meta else ""
+        if not charset:
+            charset_meta = soup.find("meta", attrs={"http-equiv": "Content-Type"})
+            if charset_meta:
+                content = charset_meta.get("content", "")
+                charset_match = re.search(r'charset=([^;]+)', content)
+                charset = charset_match.group(1) if charset_match else ""
+        
+        return {
+            "title": title,
+            "description": description,
+            "keywords": keywords,
+            "viewport": viewport,
+            "url": self.url,
+            "language": language,
+            "charset": charset
+        }

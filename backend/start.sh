@@ -1,9 +1,10 @@
 #!/bin/sh
 # Startup script for Railway deployment
-# Checks Playwright and starts the server with proper PORT handling
+# Starts the server with proper PORT handling
 
-# Check Playwright browsers
-python check_playwright.py
+# Note: Playwright is only needed for screenshots, not for scraping
+# If screenshots are needed, Playwright browsers should be installed
+# For now, we skip the check to speed up startup
 
 # Start uvicorn with PORT from environment (Railway sets this)
 # Default to 8000 if PORT is not set
