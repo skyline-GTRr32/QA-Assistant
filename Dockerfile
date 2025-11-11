@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy requirements
-COPY backend/requirements.txt .
+# Copy requirements first (for better caching)
+COPY backend/requirements.txt ./requirements.txt
 
 # Upgrade pip and install Python dependencies
 RUN pip install --upgrade pip setuptools wheel && \
@@ -21,7 +21,10 @@ RUN pip install --upgrade pip setuptools wheel && \
 RUN playwright install chromium
 
 # Copy backend code
-COPY backend/ .
+COPY backend/ ./backend/
+
+# Set working directory to backend
+WORKDIR /app/backend
 
 # Expose port
 EXPOSE $PORT
