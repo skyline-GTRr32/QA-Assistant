@@ -14,6 +14,7 @@ openai==1.51.2
 
 # PDF & Images
 PyPDF2==3.0.1
+PyMuPDF==1.24.0  # For fitz module (PDF processing)
 reportlab==4.0.9
 Pillow==10.4.0
 
