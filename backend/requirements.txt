@@ -1,43 +1,39 @@
+# Core backend
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.6
 python-dotenv==1.0.0
 nest-asyncio==1.6.0
+pydantic>=2.9.0,<3.0.0
+
+# AI & NLP
 groq==0.4.1
 chromadb==0.4.22
 sentence-transformers==2.2.2
+openai==1.51.2
+
+# PDF & Images
 PyPDF2==3.0.1
-pydantic>=2.9.0,<3.0.0
+reportlab==4.0.9
+Pillow==10.4.0
 
-
-# Option 1: Playwright (Best for dynamic/JavaScript sites) - RECOMMENDED
+# Web Scraping
 playwright==1.48.0
 cssutils==2.11.1
-
-# Option 2: For simpler static sites (Alternative)
 beautifulsoup4==4.12.3
 requests==2.32.3
 lxml==5.3.0
-
-# Option 3: For large-scale projects
 scrapy==2.11.2
-
-# Option 4: Selenium (if you prefer it over Playwright)
 selenium==4.25.0
 webdriver-manager==4.0.2
+html5lib==1.1
+cssselect==1.2.0
+pyquery==2.0.1
 
-# Additional useful libraries
-html5lib==1.1  # HTML parser
-cssselect==1.2.0  # CSS selector support
-pyquery==2.0.1  # jQuery-like syntax for Python
-
-# For data handling
+# Data Handling
 pandas==2.2.3
-openpyxl==3.1.5  # For Excel export
+openpyxl==3.1.5
 
-# OpenAI SDK for GPT-4.1 test
-openai==1.51.2
-
-# PDF Generation (ReportLab)
-reportlab==4.0.9
-Pillow==10.4.0
+# Utilities
+asyncio
+pathlib
