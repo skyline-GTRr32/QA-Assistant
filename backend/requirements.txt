@@ -8,6 +8,7 @@ pydantic>=2.9.0,<3.0.0
 # AI & NLP
 groq==0.4.1
 chromadb==0.4.22
+numpy<2.0.0  # Pin NumPy <2.0 for ChromaDB compatibility
 sentence-transformers==2.2.2
 openai==1.51.2
 
