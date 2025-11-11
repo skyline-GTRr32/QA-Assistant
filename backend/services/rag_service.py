@@ -7,19 +7,75 @@ from chromadb.utils import embedding_functions
 import fitz  # PyMuPDF
 from dotenv import load_dotenv
 import re
+from openai import OpenAI
 
 load_dotenv()
 
+class OpenAIEmbeddingFunction:
+    """Custom OpenAI embedding function compatible with openai>=1.0.0"""
+    
+    def __init__(self, api_key: str, model_name: str = "text-embedding-3-small"):
+        """
+        Initialize OpenAI embedding function.
+        
+        Args:
+            api_key: OpenAI API key
+            model_name: Embedding model name (text-embedding-3-small or text-embedding-3-large)
+        """
+        self.client = OpenAI(api_key=api_key)
+        self.model_name = model_name
+        
+        # Set dimension based on model
+        if "large" in model_name:
+            self.dimension = 3072
+        else:
+            self.dimension = 1536
+    
+    def __call__(self, input: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+        """
+        Generate embeddings for input text(s).
+        
+        Args:
+            input: Single text string or list of text strings
+            
+        Returns:
+            Single embedding vector or list of embedding vectors
+        """
+        # Handle single string input
+        if isinstance(input, str):
+            response = self.client.embeddings.create(
+                model=self.model_name,
+                input=input
+            )
+            return response.data[0].embedding
+        
+        # Handle list of strings
+        response = self.client.embeddings.create(
+            model=self.model_name,
+            input=input
+        )
+        return [item.embedding for item in response.data]
+
 class RAGService:
     def __init__(self):
-        """Initialize RAG Service with ChromaDB for vector storage."""
+        """Initialize RAG Service with ChromaDB for vector storage using OpenAI embeddings."""
         # --- FIX: REMOVED ALL LLM (Groq/OpenAI) CLIENT INITIALIZATION ---
         # This service is now only responsible for vector storage and retrieval.
         # The QA Agent will handle all LLM calls.
         
+        # Get OpenAI API key from environment
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required for embeddings")
+        
         self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
-        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
+        
+        # Use custom OpenAI embedding function compatible with openai>=1.0.0
+        # text-embedding-3-small: 1536 dimensions, faster and cheaper
+        # text-embedding-3-large: 3072 dimensions, more accurate but slower
+        self.embedding_function = OpenAIEmbeddingFunction(
+            api_key=openai_api_key,
+            model_name="text-embedding-3-small"
         )
         
     def chunk_text(self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
