@@ -53,4 +53,5 @@ RUN chmod +x check_playwright.py || true
 EXPOSE $PORT
 
 # Start command - check Playwright first, then start server
-CMD python check_playwright.py && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio
+# Use shell to expand PORT environment variable
+CMD ["sh", "-c", "python check_playwright.py && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio"]
