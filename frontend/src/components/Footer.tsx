@@ -10,8 +10,7 @@ export const Footer = () => {
           QA Assistant
         </Text>
         <Text>AI-powered website quality assurance</Text>
-        <Text fontSize="sm">Made by Umar Umais</Text>
-        <Text fontSize="sm">© 2025 • Built with ❤️ and AI</Text>
+        <Text fontSize="sm">© 2025</Text>
       </VStack>
     </Box>
   )

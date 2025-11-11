@@ -36,6 +36,8 @@ RUN pip install --upgrade pip setuptools wheel && \
 
 # Install Playwright browsers with system dependencies
 # Use --with-deps to install all required system libraries
+# Install browsers to a location that persists in the container
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
 RUN playwright install --with-deps chromium
 
 # Verify Playwright installation
@@ -44,8 +46,11 @@ RUN python -c "from playwright.sync_api import sync_playwright; p = sync_playwri
 # Copy backend code (all files from backend/ directory)
 COPY . .
 
+# Make check script executable
+RUN chmod +x check_playwright.py || true
+
 # Expose port
 EXPOSE $PORT
 
-# Start command
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}", "--loop", "asyncio"]
+# Start command - check Playwright first, then start server
+CMD python check_playwright.py && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio
